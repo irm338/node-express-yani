@@ -1,135 +1,119 @@
-
-import { Router  } from "express";
+import { Router } from "express";
 import { campers } from "../data/campers.db.js";
-import { validarCamper } from ""
+import { validarCamper } from "../middlewares/validator.js";
 
+const router = Router();
 
+function parseId(value) {
+    if (!/^[1-9]\d*$/.test(value)) {
+        return null;
+    }
 
-Router.get ("/", (req, res)) =>{
-    res.status(200).json{{
-        total: campers.length,
-        datos: campers
-    }};
-});
-
-
-Router.get ("/:id", (req, res) => {
-    const idBuscado = parseInt(res.)
-});
-
-
-
-// FALTA CODIGO
-
-
-const camperEncontrado = campers.find((c) => c.id === idBuscado);
-
-if (!camperEncontrado) {
-    return res.status(404).json({
-        error: `No se encontró ningún camper con el ID ${idBuscado}.`
-    });
+    const id = Number(value);
+    return Number.isSafeInteger(id) ? id : null;
 }
 
-res.status(200).json({
-    mensaje: "Camper encontrado exitosamente.",
-    camper: camperEncontrado
+function sendInvalidId(next) {
+    const error = new Error("El parámetro ID debe ser un entero positivo válido.");
+    error.statusCode = 400;
+    next(error);
+}
+
+// Devuelve la colección completa en un formato estable para los clientes.
+router.get("/", (req, res) => {
+    res.status(200).json({
+        total: campers.length,
+        datos: campers
     });
+});
 
+// Distingue los identificadores inválidos de los campers inexistentes.
+router.get("/:id", (req, res, next) => {
+    const id = parseId(req.params.id);
+    if (id === null) {
+        return sendInvalidId(next);
+    }
 
-/**
- * 3. [POST] /api/campers
- * Registra un nuevo camper en el arreglo en memoria.
- * Aplica el middleware "validarCamper" antes de llegar al controlador.
- * Retorna: Código 201 Created y el objeto camper recién creado
- */
+    const camper = campers.find((item) => item.id === id);
+    if (!camper) {
+        const error = new Error(`No se encontró ningún camper con el ID ${id}.`);
+        error.statusCode = 404;
+        return next(error);
+    }
 
+    res.status(200).json({
+        mensaje: "Camper encontrado exitosamente.",
+        camper
+    });
+});
+
+// Valida todos los campos antes de asignar un ID o modificar los datos.
 router.post("/", validarCamper, (req, res) => {
     const { nombre, modulo, nivel } = req.body;
-
-    // Generación de ID autoincremental seguro basado en el máximo existente
-    const nuevoId = campers.length > 0 ? Math.max(...campers.map((c) => c.id)) + 1 : 1;
-
-    const nuevoCamper = {
-        id: nuevoId,
+    const id = campers.length > 0
+        ? Math.max(...campers.map((camper) => camper.id)) + 1
+        : 1;
+    const camper = {
+        id,
         nombre: nombre.trim(),
         modulo: modulo.trim(),
         nivel: nivel.trim()
     };
 
-    campers.push(nuevoCamper);
-
+    campers.push(camper);
     res.status(201).json({
         mensaje: "Camper registrado exitosamente en memoria.",
-        camper: nuevoCamper
+        camper
     });
 });
 
-
-
-router.put("/:id", validarCamper, (req, res) => {
-    const idBuscado = parseInt(req.params.id, 10);
-
-    if (isNaN(idBuscado)) {
-        return res.status(400).json({
-            error: "El parámetro ID debe ser un número entero válido."
-        });
+// PUT reemplaza todos los campos editables; una actualización parcial requeriría PATCH.
+router.put("/:id", validarCamper, (req, res, next) => {
+    const id = parseId(req.params.id);
+    if (id === null) {
+        return sendInvalidId(next);
     }
 
-    const indice = campers.findIndex((c) => c.id === idBuscado);
-
-    if (indice === -1) {
-        return res.status(404).json({
-            error: `No es posible actualizar: No existe camper con el ID ${idBuscado}.`
-        });
+    const index = campers.findIndex((camper) => camper.id === id);
+    if (index === -1) {
+        const error = new Error(`No es posible actualizar: no existe camper con el ID ${id}.`);
+        error.statusCode = 404;
+        return next(error);
     }
 
     const { nombre, modulo, nivel } = req.body;
-
-    campers[indice] = {
-        id: idBuscado,
+    campers[index] = {
+        id,
         nombre: nombre.trim(),
         modulo: modulo.trim(),
-        nivel: nivel.train()
-
+        nivel: nivel.trim()
     };
-    res.status(280).json({
-        mensaje: `Camper con ID ${idBuscado} actualizado exitosamente.`,
-        camper: campers[indice]
+
+    res.status(200).json({
+        mensaje: `Camper con ID ${id} actualizado exitosamente.`,
+        camper: campers[index]
     });
 });
 
-/**
- * 5. [DELETE] /api/campers/:id
- * Elimina un camper del arreglo en memoria según su ID.
- * Retorna: Código 200 OK con el objeto eliminado, o 404 Not Found si no
- * existe.
- */
-router.delete("/:id", (req, res) => {
-    const idBuscado = parseInt(req.params.id, 10);
+// Elimina el registro y lo devuelve para que el cliente confirme el resultado.
+router.delete("/:id", (req, res, next) => {
+    const id = parseId(req.params.id);
+    if (id === null) {
+        return sendInvalidId(next);
+    }
 
-    if (isNaN(idBuscado)) {
-        return res.status(400).json({
-            error: "El parámetro ID debe ser un número entero válido."
-        });
+    const index = campers.findIndex((camper) => camper.id === id);
+    if (index === -1) {
+        const error = new Error(`No es posible eliminar: no existe camper con el ID ${id}.`);
+        error.statusCode = 404;
+        return next(error);
     }
-    
-    const indice = campers.findIndex((c) => c.id === idBuscado);
-    
-    if (indice === -1) {
-        return res.status(404).json({
-            error: `No es posible eliminar: No existe camper con el ID ${idBuscado}.`
-        });
-    }
-    
-    // Extraer y remover el elemento del arreglo con splice
-    const [camperEliminado] = campers.splice(indice, 1);
-    
+
+    const [camper] = campers.splice(index, 1);
     res.status(200).json({
-        mensaje: `Camper con ID ${idBuscado} eliminado exitosamente.`,
-        camper: camperEliminado
+        mensaje: `Camper con ID ${id} eliminado exitosamente.`,
+        camper
     });
 });
 
 export default router;
-
-

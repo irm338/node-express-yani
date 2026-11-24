@@ -1,15 +1,24 @@
 {
-  "name": "javascript",
+  "name": "node-express-yani",
   "version": "1.0.0",
-  "description": "practica-express",
-  "main": "campers.db.js",
+  "description": "API REST de campers con Express y ES Modules",
+  "main": "src/app.js",
   "scripts": {
-    "dev": "nodemon -- watch app.js -- quiet"
+    "start": "node src/server.js",
+    "dev": "node --watch src/server.js",
+    "test": "node --test"
   },
-  "keywords": [],
+  "keywords": [
+    "express",
+    "api",
+    "campers"
+  ],
   "author": "",
   "license": "ISC",
   "type": "module",
+  "engines": {
+    "node": ">=18.11"
+  },
   "dependencies": {
     "express": "^5.3.0"
   }
